@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>知识大纲分层回顾</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="app-container">
+        <header class="main-header">
+            <h1>知识大纲分层回顾</h1>
+            <nav class="main-nav">
+                <ul>
+                    <li><a href="index.html">首页</a></li>
+                    <li><a href="outlineditor.html">创建大纲</a></li>
+                    <li><a href="review.html" class="active">分层回顾</a></li>
+                </ul>
+            </nav>
+        </header>
+
+        <main class="main-content">
+            <div class="review-container">
+                <div class="review-header">
+                    <h2 id="outline-title">选择大纲进行回顾</h2>
+                    <div class="review-controls">
+                        <button id="back-btn" class="btn btn-secondary">返回首页</button>
+                    </div>
+                </div>
+
+                <div id="outline-selector" class="outline-selector">
+                    <p class="no-outlines-message">请先选择一个大纲进行回顾</p>
+                </div>
+
+                <div id="review-content" class="review-content" style="display: none;">
+                    <div class="level-selector" id="level-selector">
+                        <!-- 层级选择按钮将在JS中动态生成 -->
+                    </div>
+
+                    <div class="review-display" id="review-display">
+                        <!-- 回顾内容将在JS中动态生成 -->
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <footer class="main-footer">
+            <p>&copy; 2025 知识大纲管理与回顾系统</p>
+        </footer>
+    </div>
+
+    <script src="js/storage.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // 获取DOM元素
+            const outlineTitle = document.getElementById('outline-title');
+            const outlineSelector = document.getElementById('outline-selector');
+            const reviewContent = document.getElementById('review-content');
+            const levelSelector = document.getElementById('level-selector');
+            const reviewDisplay = document.getElementById('review-display');
+            const backBtn = document.getElementById('back-btn');
+            
+            // 当前选中的大纲和层级
+            let currentOutline = null;
+            let currentLevel = 0;
+            let maxLevel = 0;
+            
+            // 初始化页面
+            init();
+            
+            function init() {
+                // 获取URL参数
+                const urlParams = new URLSearchParams(window.location.search);
+                const outlineId = urlParams.get('id');
+                
+                if (outlineId) {
+                    // 如果URL中有大纲ID，直接加载该大纲
+                    loadOutline(outlineId);
+                } else {
+                    // 否则显示大纲选择界面
+                    showOutlineSelector();
+                }
+                
+                // 绑定返回按钮事件
+                backBtn.addEventListener('click', function() {
+                    window.location.href = 'index.html';
+                });
+            }
+            
+            /**
+             * 显示大纲选择界面
+             */
+            function showOutlineSelector() {
+                const outlines = outlineStorage.getAllOutlines();
+                
+                if (outlines.length === 0) {
+                    outlineSelector.innerHTML = '<p class="no-outlines-message">您还没有创建任何大纲。<a href="outlineeditor.html">点击创建</a></p>';
+                    return;
+                }
+                
+                outlineSelector.innerHTML = '<h3>选择要回顾的大纲：</h3><div class="outline-cards"></div>';
+                const outlineCards = outlineSelector.querySelector('.outline-cards');
+                
+                outlines.forEach(outline => {
+                    const card = document.createElement('div');
+                    card.className = 'outline-card';
+                    card.innerHTML = `
+                        <h3>${outline.title}</h3>
+                        <p>${outline.description || '无描述'}</p>
+                        <button class="btn select-outline-btn" data-id="${outline.id}">选择此大纲</button>
+                    `;
+                    outlineCards.appendChild(card);
+                    
+                    // 绑定选择按钮事件
+                    card.querySelector('.select-outline-btn').addEventListener('click', function() {
+                        loadOutline(outline.id);
+                    });
+                });
+            }
+            
+            /**
+             * 加载指定ID的大纲
+             * @param {string} outlineId 大纲ID
+             */
+            function loadOutline(outlineId) {
+                const outline = outlineStorage.getOutlineById(outlineId);
+                if (!outline) {
+                    alert('找不到指定的大纲');
+                    return;
+                }
+                
+                currentOutline = outline;
+                outlineTitle.textContent = outline.title;
+                
+                // 隐藏选择器，显示回顾内容
+                outlineSelector.style.display = 'none';
+                reviewContent.style.display = 'block';
+                
+                // 计算最大层级
+                maxLevel = 0;
+                if (outline.content && outline.content.length > 0) {
+                    outline.content.forEach(item => {
+                        maxLevel = Math.max(maxLevel, item.level);
+                    });
+                }
+                
+                // 创建层级选择器
+                createLevelSelector();
+                
+                // 默认显示第0层
+                showLevel(0);
+            }
+            
+            /**
+             * 创建层级选择器
+             */
+            function createLevelSelector() {
+                levelSelector.innerHTML = '';
+                
+                for (let i = 0; i <= maxLevel; i++) {
+                    const btn = document.createElement('button');
+                    btn.className = `level-btn ${i === currentLevel ? 'active' : ''}`;
+                    btn.textContent = `层级 ${i}`;
+                    btn.dataset.level = i;
+                    
+                    btn.addEventListener('click', function() {
+                        const level = parseInt(this.dataset.level);
+                        showLevel(level);
+                    });
+                    
+                    levelSelector.appendChild(btn);
+                }
+            }
+            
+            /**
+             * 显示指定层级的内容
+             * @param {number} level 层级
+             */
+            function showLevel(level) {
+                currentLevel = level;
+                
+                // 更新层级按钮状态
+                const buttons = levelSelector.querySelectorAll('.level-btn');
+                buttons.forEach(btn => {
+                    btn.classList.toggle('active', parseInt(btn.dataset.level) === level);
+                });
+                
+                // 过滤并显示当前层级及以下的内容
+                const filteredContent = currentOutline.content.filter(item => item.level <= level);
+                
+                if (filteredContent.length === 0) {
+                    reviewDisplay.innerHTML = '<p class="no-content-message">此层级没有内容</p>';
+                    return;
+                }
+                
+                // 创建回顾显示内容
+                reviewDisplay.innerHTML = '';
+                const outlineList = document.createElement('div');
+                outlineList.className = 'outline-list';
+                
+                // 构建编号系统
+                const numbering = [];
+                
+                filteredContent.forEach(item => {
+                    const itemLevel = item.level;
+                    
+                    // 维护每级的编号
+                    numbering[itemLevel] = (numbering[itemLevel] || 0) + 1;
+                    // 清除更深层级的编号
+                    numbering.splice(itemLevel + 1);
+                    
+                    // 生成层级编号
+                    const numbers = numbering.slice(0, itemLevel + 1);
+                    const lineNumber = numbers.join('.');
+                    
+                    // 创建显示元素
+                    const outlineItem = document.createElement('div');
+                    outlineItem.className = `outline-item level-${itemLevel}`;
+                    outlineItem.innerHTML = `
+                        <span class="outline-number">${lineNumber}.</span>
+                        <span class="outline-content">${escapeHtml(item.content)}</span>
+                    `;
+                    
+                    outlineList.appendChild(outlineItem);
+                });
+                
+                reviewDisplay.appendChild(outlineList);
+            }
+            
+            /**
+             * HTML转义函数
+             * @param {string} text 要转义的文本
+             * @returns {string} 转义后的HTML
+             */
+            function escapeHtml(text) {
+                const div = document.createElement('div');
+                div.textContent = text || '';
+                return div.innerHTML;
+            }
+        });
+    </script>
+    
+    <style>
+        /* 回顾页面特定样式 */
+        .outline-selector {
+            margin-bottom: 20px;
+        }
+        
+        .outline-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        .level-selector {
+            display: flex;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+            gap: 5px;
+        }
+        
+        .level-btn {
+            padding: 8px 16px;
+            background: #f1f3f5;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .level-btn.active {
+            background: #007acc;
+            color: #fff;
+            border-color: #007acc;
+        }
+        
+        .outline-list {
+            margin-top: 20px;
+        }
+        
+        .outline-item {
+            margin: 10px 0;
+            padding: 5px 0;
+        }
+        
+        .outline-item.level-0 { margin-left: 0; }
+        .outline-item.level-1 { margin-left: 24px; }
+        .outline-item.level-2 { margin-left: 48px; }
+        .outline-item.level-3 { margin-left: 72px; }
+        .outline-item.level-4 { margin-left: 96px; }
+        .outline-item.level-5 { margin-left: 120px; }
+        
+        .outline-number {
+            color: #007acc;
+            font-weight: 600;
+            margin-right: 8px;
+        }
+        
+        .no-content-message {
+            color: #666;
+            font-style: italic;
+            text-align: center;
+            padding: 20px;
+        }
+    </style>
+</body>
+</html>

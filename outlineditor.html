@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>知识大纲编辑器</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f8f9fa;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            padding: 20px;
+            border-bottom: 1px solid #e9ecef;
+            background: #fff;
+        }
+
+        .header h1 {
+            font-size: 20px;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .editor {
+            min-height: 500px;
+            padding: 20px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-size: 14px;
+            line-height: 1.8;
+            outline: none;
+        }
+
+        .line {
+            min-height: 1.8em;
+            margin: 2px 0;
+            position: relative;
+            cursor: text;
+        }
+
+        .line.editing {
+            background: rgba(0, 122, 204, 0.05);
+            border-radius: 3px;
+            padding: 2px 4px;
+            margin: 0 -4px;
+        }
+
+        .line-editing-container {
+            display: flex;
+            align-items: center;
+        }
+
+        .line-editing-container.level-0 { margin-left: 0; }
+        .line-editing-container.level-1 { margin-left: 24px; }
+        .line-editing-container.level-2 { margin-left: 48px; }
+        .line-editing-container.level-3 { margin-left: 72px; }
+        .line-editing-container.level-4 { margin-left: 96px; }
+        .line-editing-container.level-5 { margin-left: 120px; }
+
+        .line-number {
+            color: #007acc;
+            font-weight: 600;
+            margin-right: 8px;
+            min-width: fit-content;
+        }
+
+        .line-input {
+            flex: 1;
+            border: none;
+            outline: none;
+            background: transparent;
+            font-family: inherit;
+            font-size: inherit;
+            line-height: inherit;
+            color: #333;
+            padding: 0;
+        }
+
+        .line-content {
+            position: relative;
+        }
+
+        .line-content.level-0 { margin-left: 0; }
+        .line-content.level-1 { margin-left: 24px; }
+        .line-content.level-2 { margin-left: 48px; }
+        .line-content.level-3 { margin-left: 72px; }
+        .line-content.level-4 { margin-left: 96px; }
+        .line-content.level-5 { margin-left: 120px; }
+
+        .outline-number {
+            color: #007acc;
+            font-weight: 600;
+            margin-right: 8px;
+        }
+
+        .outline-content {
+            color: #333;
+        }
+
+        .empty-line {
+            color: #999;
+            font-style: italic;
+        }
+
+        .footer {
+            padding: 15px 20px;
+            background: #f8f9fa;
+            border-top: 1px solid #e9ecef;
+            font-size: 12px;
+            color: #666;
+            text-align: center;
+        }
+
+        /* 滚动条样式 */
+        .editor::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .editor::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+
+        .editor::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <header class="main-header">
+            <h1>知识大纲编辑器</h1>
+            <nav class="main-nav">
+                <ul>
+                    <li><a href="index.html">首页</a></li>
+                    <li><a href="outlineditor.html" class="active">创建大纲</a></li>
+                    <li><a href="review.html">分层回顾</a></li>
+                </ul>
+            </nav>
+        </header>
+
+        <div class="container">
+            <div class="editor-header">
+                <div class="editor-title">
+                    <input type="text" id="outline-title" placeholder="输入大纲标题" class="title-input">
+                </div>
+                <div class="editor-actions">
+                    <button id="save-btn" class="btn">保存大纲</button>
+                    <button id="back-btn" class="btn btn-secondary">返回首页</button>
+                </div>
+            </div>
+            
+            <div class="header">
+                <h1>知识大纲编辑</h1>
+                <p>输入内容创建列表项 | Tab 调整缩进 | 点击任意行编辑</p>
+            </div>
+            
+            <div class="editor" id="editor" contenteditable="false">
+                <div class="line empty-line">开始输入你的大纲...</div>
+            </div>
+            
+            <div class="footer">
+                按 Tab 键增加缩进，按 Shift+Tab 减少缩进 | 支持多级嵌套自动编号
+            </div>
+        </div>
+
+        <div class="save-notification" id="save-notification">
+            <span id="notification-message">大纲已保存</span>
+        </div>
+    </div>
+
+    <script src="js/storage.js"></script>
+    <script>
+        class OutlineEditor {
+            constructor() {
+                this.editor = document.getElementById('editor');
+                this.currentEditingLine = null;
+                this.init();
+            }
+
+            init() {
+                this.editor.addEventListener('click', (e) => this.handleClick(e));
+                this.editor.addEventListener('keydown', (e) => this.handleKeydown(e));
+                this.createFirstLine();
+            }
+
+            createFirstLine() {
+                const line = this.createEditableLine('', 0);
+                this.editor.innerHTML = '';
+                this.editor.appendChild(line);
+                this.startEditing(line);
+            }
+
+            // 计算当前行应该显示的编号
+            calculateLineNumber(line, level) {
+                const lines = Array.from(this.editor.children);
+                const lineIndex = lines.indexOf(line);
+                const numbering = [];
+                
+                // 计算到当前行为止的编号
+                for (let i = 0; i <= lineIndex; i++) {
+                    const currentLine = lines[i];
+                    if (currentLine.classList.contains('empty-line')) continue;
+                    
+                    let currentLevel;
+                    if (currentLine === line) {
+                        currentLevel = level; // 使用传入的级别
+                    } else {
+                        currentLevel = parseInt(currentLine.getAttribute('data-level')) || 0;
+                    }
+                    
+                    const content = currentLine.getAttribute('data-content') || '';
+                    if (content.trim() || currentLine === line) {
+                        // 维护每级的编号
+                        numbering[currentLevel] = (numbering[currentLevel] || 0) + 1;
+                        // 清除更深层级的编号
+                        numbering.splice(currentLevel + 1);
+                    }
+                }
+                
+                // 生成层级编号
+                const numbers = numbering.slice(0, level + 1);
+                return numbers.join('.');
+            }
+
+            createEditableLine(content, level) {
+                const lineDiv = document.createElement('div');
+                lineDiv.className = 'line';
+                lineDiv.setAttribute('data-content', content || '');
+                lineDiv.setAttribute('data-level', level || 0);
+                
+                return lineDiv;
+            }
+
+            handleClick(e) {
+                const line = e.target.closest('.line');
+                if (line && !line.classList.contains('editing')) {
+                    this.startEditing(line);
+                }
+            }
+
+            startEditing(line) {
+                if (this.currentEditingLine && this.currentEditingLine !== line) {
+                    this.finishEditing(this.currentEditingLine);
+                }
+
+                const content = line.getAttribute('data-content') || '';
+                const level = parseInt(line.getAttribute('data-level')) || 0;
+                
+                line.className = 'line editing';
+                
+                // 创建编辑容器
+                const container = document.createElement('div');
+                container.className = `line-editing-container level-${level}`;
+                
+                // 创建编号显示
+                const numberSpan = document.createElement('span');
+                numberSpan.className = 'line-number';
+                const lineNumber = this.calculateLineNumber(line, level);
+                numberSpan.textContent = lineNumber + '.';
+                
+                // 创建输入框
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.className = 'line-input';
+                input.value = content;
+                
+                input.addEventListener('blur', () => this.finishEditing(line));
+                input.addEventListener('keydown', (e) => this.handleInputKeydown(e, line));
+                input.addEventListener('input', () => this.handleInput(input, line));
+                
+                container.appendChild(numberSpan);
+                container.appendChild(input);
+                
+                line.innerHTML = '';
+                line.appendChild(container);
+                
+                // 延迟聚焦以确保DOM更新完成
+                setTimeout(() => {
+                    if (input && input.parentNode) {
+                        input.focus();
+                        input.setSelectionRange(input.value.length, input.value.length);
+                    }
+                }, 0);
+                
+                this.currentEditingLine = line;
+            }
+
+            finishEditing(line) {
+                if (!line || !line.classList.contains('editing')) return;
+                
+                const input = line.querySelector('.line-input');
+                if (!input) return;
+                
+                const content = input.value || '';
+                const level = parseInt(line.getAttribute('data-level')) || 0;
+                
+                line.classList.remove('editing');
+                this.currentEditingLine = null;
+                
+                // 更新内容
+                line.setAttribute('data-content', content);
+                
+                if (content.trim() === '') {
+                    // 空行处理
+                    if (this.editor.children.length === 1) {
+                        // 如果只有一行且为空，显示提示
+                        line.className = 'line empty-line';
+                        line.innerHTML = '开始输入你的大纲...';
+                        line.addEventListener('click', () => this.startEditing(line));
+                        line.removeAttribute('data-content');
+                        line.removeAttribute('data-level');
+                        return;
+                    } else {
+                        // 多行时删除空行
+                        line.remove();
+                        this.updateAllNumbers();
+                        return;
+                    }
+                }
+
+                // 创建显示内容
+                this.createDisplayContent(line, content, level);
+                
+                // 添加点击事件
+                line.addEventListener('click', () => this.startEditing(line));
+                
+                // 更新所有编号
+                this.updateAllNumbers();
+            }
+
+            createDisplayContent(line, content, level) {
+                const contentDiv = document.createElement('div');
+                contentDiv.className = `line-content level-${level}`;
+                
+                const lineNumber = this.calculateLineNumber(line, level);
+                contentDiv.innerHTML = `<span class="outline-number">${lineNumber}.</span><span class="outline-content">${this.escapeHtml(content)}</span>`;
+                
+                line.innerHTML = '';
+                line.appendChild(contentDiv);
+            }
+
+            updateAllNumbers() {
+                const lines = Array.from(this.editor.children);
+                
+                lines.forEach(line => {
+                    if (line.classList.contains('editing') || line.classList.contains('empty-line')) {
+                        return;
+                    }
+                    
+                    const content = line.getAttribute('data-content') || '';
+                    const level = parseInt(line.getAttribute('data-level')) || 0;
+                    
+                    if (content.trim()) {
+                        this.createDisplayContent(line, content, level);
+                    }
+                });
+            }
+
+            handleInputKeydown(e, line) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    this.finishEditing(line);
+                    this.createNewLine(line);
+                } else if (e.key === 'Tab') {
+                    e.preventDefault();
+                    
+                    const currentLevel = parseInt(line.getAttribute('data-level')) || 0;
+                    let newLevel = currentLevel;
+                    
+                    if (e.shiftKey) {
+                        // 减少缩进
+                        newLevel = Math.max(0, currentLevel - 1);
+                    } else {
+                        // 增加缩进
+                        newLevel = Math.min(5, currentLevel + 1);
+                    }
+                    
+                    if (newLevel !== currentLevel) {
+                        line.setAttribute('data-level', newLevel);
+                        
+                        // 更新编辑界面的缩进和编号
+                        const container = line.querySelector('.line-editing-container');
+                        const numberSpan = line.querySelector('.line-number');
+                        if (container && numberSpan) {
+                            container.className = `line-editing-container level-${newLevel}`;
+                            const lineNumber = this.calculateLineNumber(line, newLevel);
+                            numberSpan.textContent = lineNumber + '.';
+                        }
+                    }
+                } else if (e.key === 'Backspace' && e.target.value === '') {
+                    e.preventDefault();
+                    this.deleteLine(line);
+                }
+            }
+
+            handleInput(input, line) {
+                if (input && line) {
+                    // 实时更新内容
+                    line.setAttribute('data-content', input.value || '');
+                }
+            }
+
+            createNewLine(afterLine) {
+                const currentLevel = parseInt(afterLine.getAttribute('data-level')) || 0;
+                const newLine = this.createEditableLine('', currentLevel);
+                afterLine.insertAdjacentElement('afterend', newLine);
+                this.startEditing(newLine);
+            }
+
+            deleteLine(line) {
+                const prevLine = line.previousElementSibling;
+                line.remove();
+                
+                if (prevLine) {
+                    this.startEditing(prevLine);
+                } else if (this.editor.children.length === 0) {
+                    this.createFirstLine();
+                }
+                
+                this.updateAllNumbers();
+            }
+
+            handleKeydown(e) {
+                // 全局快捷键处理
+                if (e.key === 'Tab' && this.currentEditingLine) {
+                    e.preventDefault();
+                }
+            }
+
+            escapeHtml(text) {
+                const div = document.createElement('div');
+                div.textContent = text || '';
+                return div.innerHTML;
+            }
+        }
+
+        // 编辑器实例
+        let editor;
+
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            // 初始化编辑器
+            editor = new OutlineEditor();
+
+            // 获取URL参数
+            const urlParams = new URLSearchParams(window.location.search);
+            const outlineId = urlParams.get('id');
+
+            // 获取DOM元素
+            const saveBtn = document.getElementById('save-btn');
+            const backBtn = document.getElementById('back-btn');
+            const outlineTitleInput = document.getElementById('outline-title');
+            const saveNotification = document.getElementById('save-notification');
+
+            // 如果有ID参数，加载现有大纲
+            if (outlineId) {
+                const outline = outlineStorage.getOutlineById(outlineId);
+                if (outline) {
+                    // 设置标题
+                    outlineTitleInput.value = outline.title;
+
+                    // 加载大纲内容
+                    if (outline.content && outline.content.length > 0) {
+                        // 清空编辑器
+                        editor.editor.innerHTML = '';
+
+                        // 转换并添加内容
+                        const editorLines = OutlineStorage.convertToEditor(outline.content);
+                        editorLines.forEach(line => {
+                            editor.editor.appendChild(line);
+                        });
+
+                        // 更新所有编号
+                        editor.updateAllNumbers();
+                    }
+                }
+            }
+
+            // 绑定保存按钮事件
+            saveBtn.addEventListener('click', function() {
+                // 禁用按钮，防止重复点击
+                saveBtn.disabled = true;
+                saveBtn.textContent = '正在保存...';
+                
+                const title = outlineTitleInput.value.trim() || '未命名大纲';
+                
+                // 检查标题是否已存在
+                if (outlineStorage.isTitleExists(title, outlineId)) {
+                    showNotification('大纲标题已存在，请修改标题后再保存', 'error');
+                    saveBtn.disabled = false;
+                    saveBtn.textContent = '保存大纲';
+                    return;
+                }
+                
+                // 获取所有非空行
+                const lines = Array.from(editor.editor.children).filter(line => 
+                    !line.classList.contains('empty-line')
+                );
+
+                // 转换为存储格式
+                const content = OutlineStorage.convertFromEditor(lines);
+
+                if (outlineId) {
+                    // 更新现有大纲
+                    outlineStorage.updateOutline(outlineId, { title, content });
+                } else {
+                    // 创建新大纲
+                    const newId = outlineStorage.addOutline({ title, content });
+                    // 更新URL，不刷新页面
+                    window.history.replaceState(null, '', `outlineditor.html?id=${newId}`);
+                    outlineId = newId; // 更新当前 ID
+                }
+
+                // 显示保存成功通知
+                showNotification('大纲已成功保存', 'success');
+                
+                // 恢复按钮状态
+                setTimeout(() => {
+                    saveBtn.disabled = false;
+                    saveBtn.textContent = '保存大纲';
+                }, 1000);
+            });
+
+            // 绑定返回按钮事件
+            backBtn.addEventListener('click', function() {
+                window.location.href = 'index.html';
+            });
+
+            // 显示通知函数
+            function showNotification(message, type = 'success') {
+                const notification = document.getElementById('save-notification');
+                const messageElement = document.getElementById('notification-message');
+                
+                // 移除所有类型类
+                notification.classList.remove('success', 'error');
+                // 添加当前类型类
+                notification.classList.add(type);
+                
+                messageElement.textContent = message;
+                notification.classList.add('show');
+                
+                setTimeout(() => {
+                    notification.classList.remove('show');
+                }, 3000);
+            }
+        });
+    </script>
+
+    <style>
+        /* 编辑器页面特定样式 */
+        .editor-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .editor-title {
+            flex: 1;
+        }
+
+        .title-input {
+            width: 100%;
+            padding: 8px 12px;
+            font-size: 18px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .editor-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .save-notification {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 10px 20px;
+            border-radius: 4px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.3s ease;
+            color: white;
+        }
+        
+        .save-notification.success {
+            background-color: #28a745;
+        }
+        
+        .save-notification.error {
+            background-color: #dc3545;
+        }
+        
+        .save-notification.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    </style>
+</body>
+</html>

@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>知识大纲管理与回顾系统</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="app-container">
+        <header class="main-header">
+            <h1>知识大纲管理与回顾系统</h1>
+            <nav class="main-nav">
+                <ul>
+                    <li><a href="index.html" class="active">首页</a></li>
+                    <li><a href="outlineditor.html">创建大纲</a></li>
+                    <li><a href="review.html">分层回顾</a></li>
+                </ul>
+            </nav>
+        </header>
+
+        <main class="main-content">
+            <section class="welcome-section">
+                <h2>欢迎使用知识大纲管理与回顾系统</h2>
+                <p>这是一个帮助您创建、管理和分层回顾知识大纲的工具。</p>
+            </section>
+
+            <section class="features-section">
+                <div class="feature-card">
+                    <h3>创建大纲</h3>
+                    <p>使用直观的大纲编辑器创建结构化的知识大纲。</p>
+                    <a href="outlineditor.html" class="btn">开始创建</a>
+                </div>
+                <div class="feature-card">
+                    <h3>管理大纲</h3>
+                    <p>查看、编辑和删除您创建的所有知识大纲。</p>
+                    <a href="#" class="btn" id="manage-btn">管理大纲</a>
+                </div>
+                <div class="feature-card">
+                    <h3>分层回顾</h3>
+                    <p>按照层级逐步回顾和复习您的知识大纲。</p>
+                    <a href="review.html" class="btn">开始回顾</a>
+                </div>
+            </section>
+
+            <section class="outlines-section">
+                <h2>我的大纲</h2>
+                <div class="outlines-container" id="outlines-container">
+                    <p class="no-outlines-message">您还没有创建任何大纲。</p>
+                </div>
+            </section>
+        </main>
+
+        <footer class="main-footer">
+            <p>&copy; 2025 知识大纲管理与回顾系统</p>
+        </footer>
+    </div>
+
+    <div class="modal" id="outline-modal">
+        <div class="modal-content">
+            <span class="close-btn">&times;</span>
+            <h2>大纲详情</h2>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="outline-title">标题</label>
+                    <input type="text" id="outline-title" placeholder="输入大纲标题">
+                </div>
+                <div class="form-group">
+                    <label for="outline-description">描述</label>
+                    <textarea id="outline-description" placeholder="输入大纲描述"></textarea>
+                </div>
+                <div class="form-actions">
+                    <button id="save-outline-btn" class="btn">保存</button>
+                    <button id="cancel-outline-btn" class="btn btn-secondary">取消</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/storage.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>
